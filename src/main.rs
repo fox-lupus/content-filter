@@ -1,4 +1,4 @@
-//https lib
+//htps l
 use reqwest;
 //args
 use std::env;
@@ -13,33 +13,43 @@ use std::io::BufRead;
 
 use std::io;
 
-fn get_uniq(Check:String) -> HashSet<String> {
-    let mut uniqWord = HashSet::new();
-    for part in Check.split_whitespace() {
+//find and returns all unique words contained with in a string
+fn get_uniq(check:String) -> HashSet<String> {
+    let mut uniq_word = HashSet::new();
+    for part in check.split_whitespace() {
 
-        uniqWord.insert(part.to_lowercase());
+        uniq_word.insert(part.to_lowercase());
     }
-    return uniqWord
+    return uniq_word
 }
-
-fn check_url(url:String, banned:Vec<String>) {
-    let body = reqwest::blocking::get(url).expect("Response").text();
-    let words = get_uniq(body.expect("Response"));
+//checks a url if it contains
+fn check_url(url:String, banned:Vec<String>) -> Result<bool, reqwest::Error> {
+    //get html of url
+    let body = reqwest::blocking::get(url)?.text().expect("");
+    //find every unique word
+    let words = get_uniq(body.clone());
 
     let matcher = SkimMatcherV2::default();
+    let mut found = false;
 
     for word in words {
+        //stop so don't have to find dupe
+        if found {
+            break;
+        }
         for ban in &banned {
             if let Some(score) = matcher.fuzzy_indices(&word, &ban) {
-                let (score, index) = score;
+                let (score, _) = score; //trupe deconstuction
                 if score >= 190 {
-                    println!("{word} {ban}");
-                    println!("{:?}", index);
+                    found = true;
+                    //println!("{word} {ban}");
+                    //println!("{:?}", index);
                 }
             }
         }
     }
 
+    return Ok(found);
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
@@ -65,10 +75,17 @@ fn read_ban(filename:String) -> Vec<String> {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let banLoc = args.get(1); //temp
-    let banList = read_ban("en.txt".to_string());
+    let ban_loc = match args.get(1){
+        Some(loc) => loc,
+        _ => panic!("requires command line arg for location of banned wordlist \nexample: en.txt url"),
+    };
+    let ban_list = read_ban(ban_loc.to_string());
     //println!("{:?}", banList);
-    check_url("http://en.wikipedia.org/wiki/transgender".to_string(), banList);
+    let url = match args.get(2){
+        Some(url) => url,
+        _ => panic!("url of website to be checked is required \nexample: file https://google.com"),
+    };
+    println!("Contain profanity? {:?}", check_url(url.to_string(), ban_list));
         
     //println!("body = {body:?}");
 }
